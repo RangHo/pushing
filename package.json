@@ -1,0 +1,35 @@
+{
+  "name": "pushing",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Simple ",
+  "author": "RangHo Lee",
+  "license": "MPL-2.0",
+  "homepage": "https://rangho.dev/pushing",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RangHo/pushing"
+  },
+  "keywords": [],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": "bin/pushing.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write .",
+    "lint": "prettier --check . && eslint ."
+  },
+  "dependencies": {
+    "@noble/curves": "^1.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.23.0",
+    "@tsconfig/strictest": "^2.0.5",
+    "eslint": "^9.23.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.28.0"
+  },
+  "packageManager": "pnpm@10.6.4"
+}
