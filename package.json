@@ -16,18 +16,24 @@
   "bin": "bin/pushing.js",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --passWithNoTests",
     "format": "prettier --write .",
     "lint": "prettier --check . && eslint ."
   },
   "dependencies": {
-    "@noble/curves": "^1.8.1"
+    "@noble/ciphers": "^1.2.1",
+    "@noble/curves": "^1.8.1",
+    "@scure/base": "^1.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.23.0",
+    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@tsconfig/strictest": "^2.0.5",
+    "@types/jest": "^29.5.14",
     "eslint": "^9.23.0",
+    "jest": "^29.7.0",
     "prettier": "^3.5.3",
+    "ts-jest": "^29.3.1",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.28.0"
   },
