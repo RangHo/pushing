@@ -10,15 +10,16 @@ import {
   AES128GCM_RS_MAXIMUM,
   AES128GCM_RS_MINIMUM,
   AES128GCM_SALT_LENGTH,
-  UINT8ARRAY_ONE,
 } from '../constants';
 import { concat } from '../utilities';
 import { gcm } from '@noble/ciphers/aes';
-import { expand, extract, hkdf } from '@noble/hashes/hkdf';
-import { hmac } from '@noble/hashes/hmac';
+import { expand, extract } from '@noble/hashes/hkdf';
 import { sha256 } from '@noble/hashes/sha2';
 import { randomBytes } from '@noble/hashes/utils';
 
+/**
+ * AES-128-GCM encrypted content encoding provider.
+ */
 export class AES128GCM extends ECE {
   /**
    * Internal cache for the pseudo-random key (PRK).
@@ -26,7 +27,11 @@ export class AES128GCM extends ECE {
   private _prk: Uint8Array | null = null;
 
   /**
-   * The pseudo-random key (PRK) derived from the input key material (IKM) and the salt identifed from the header.
+   * Pseudo-random key (PRK) derived from the input key material (IKM) and the salt identifed from the header.
+   *
+   * This value is derived by calculating the following::
+   *
+   *     PRK = HKDF-Extract(IKM, salt)
    */
   get prk() {
     if (!this._prk) {
@@ -41,20 +46,15 @@ export class AES128GCM extends ECE {
   private _cek: Uint8Array | null = null;
 
   /**
-   * The content-encryption key (CEK) derived from the pseudo-random key (PRK).
+   * Content-encryption key (CEK) derived from the pseudo-random key (PRK).
    *
    * This value is derived by calculating the following with the length (L) parameter set to 16:
    *
-   *     CEK = HMAC-SHA-256(PRK, cek_info || 0x01)
+   *     CEK = HKDF-Expand(PRK, cek_info || 0x01)
    */
   get cek() {
     if (!this._cek) {
-      this._cek = expand(
-        sha256,
-        this.prk,
-        AES128GCM_CEK_INFO,
-        AES128GCM_CEK_LENGTH
-      );
+      this._cek = expand(sha256, this.prk, AES128GCM_CEK_INFO, AES128GCM_CEK_LENGTH);
     }
     return this._cek;
   }
@@ -65,20 +65,18 @@ export class AES128GCM extends ECE {
   private _nonce: Uint8Array | null = null;
 
   /**
-   * The nonce value for a given sequence number.
+   * Nonce value for a given sequence number.
    *
-   * This value is derived by calculating the following:
+   * This value is derived by calculating the following with the length (L) parameter set to 12:
    *
-   *     NONCE = HMAC-SHA-256(PRK, nonce_info || 0x01) XOR SEQ
+   *     NONCE = HKDF-Expand(PRK, nonce_info || 0x01) XOR SEQ
+   *
+   * @param seq - The sequence number of the record.
+   * @returns The nonce value for the given sequence number.
    */
   nonce(seq: number) {
     if (!this._nonce) {
-      this._nonce = expand(
-        sha256,
-        this.prk,
-        AES128GCM_NONCE_INFO,
-        AES128GCM_NONCE_LENGTH
-      );
+      this._nonce = expand(sha256, this.prk, AES128GCM_NONCE_INFO, AES128GCM_NONCE_LENGTH);
     }
 
     // While seq is a 96-bit integer, it is hard to work with in JavaScript.
@@ -95,14 +93,22 @@ export class AES128GCM extends ECE {
     seqView.setUint32(8, seq);
     const seqArray = new Uint8Array(seqBuffer, 0, AES128GCM_NONCE_LENGTH);
     const result = new Uint8Array(AES128GCM_NONCE_LENGTH);
-    for (let i = 0; i < result.length; i++) {
+    for (let i = 0; i < AES128GCM_NONCE_LENGTH; i++) {
       // XOR the nonce with the sequence number.
+      // Note: since we create all arrays with set length, the indices are guaranteed to resolve.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       result[i] = this._nonce[i]! ^ seqArray[i]!;
     }
 
     return result;
   }
 
+  /**
+   * Create a new AES128GCM instance with the given input key material (IKM) and optional header.
+   *
+   * @param ikm - The input key material (IKM) used to derive the PRK and CEK.
+   * @param header - The header used to derive the salt and record size. If not provided, a default header will be created.
+   */
   constructor(
     readonly ikm: Uint8Array,
     readonly header: AES128GCMHeader = new AES128GCMHeader()
@@ -110,22 +116,22 @@ export class AES128GCM extends ECE {
     super();
   }
 
-  override decrypt(data: Uint8Array, seq: number = 0) {
+  override encrypt(data: Uint8Array, seq = 0) {
+    const aes = gcm(this.cek, this.nonce(seq));
+    const ciphertext = aes.encrypt(data);
+    return concat(this.header.toBytes(), ciphertext);
+  }
+
+  override decrypt(data: Uint8Array, seq = 0) {
     // Extract the ciphertext from the data.
     const ciphertext = data.subarray(this.header.byteLength, data.byteLength);
     const aes = gcm(this.cek, this.nonce(seq));
     return aes.decrypt(ciphertext);
   }
-
-  override encrypt(data: Uint8Array, seq: number = 0) {
-    const aes = gcm(this.cek, this.nonce(seq));
-    const ciphertext = aes.encrypt(data);
-    return concat(this.header.toBytes(), ciphertext);
-  }
 }
 
 /**
- * Header
+ * Header describing the parameters for AES-128-GCM encrypted content encoding scheme.
  */
 export class AES128GCMHeader extends ECEHeader {
   /**
@@ -193,11 +199,11 @@ export class AES128GCMHeader extends ECEHeader {
   }
 
   override toBytes(): Uint8Array {
-    let rsBuffer = new ArrayBuffer(AES128GCM_RS_LENGTH);
-    let rsView = new DataView(rsBuffer);
+    const rsBuffer = new ArrayBuffer(AES128GCM_RS_LENGTH);
+    const rsView = new DataView(rsBuffer);
     rsView.setUint32(0, this.rs);
 
-    let result = new Uint8Array(this.byteLength);
+    const result = new Uint8Array(this.byteLength);
     result.set(this.salt, 0);
     result.set(new Uint8Array(rsBuffer), AES128GCM_SALT_LENGTH);
     result[AES128GCM_SALT_LENGTH + AES128GCM_RS_LENGTH] = this.idlen;
