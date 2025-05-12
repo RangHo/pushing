@@ -1,4 +1,4 @@
-import { ECE, ECEHeader } from '.';
+import { ECE } from '.';
 import {
   AES128GCM_CEK_INFO,
   AES128GCM_CEK_LENGTH,
@@ -20,7 +20,7 @@ import { randomBytes } from '@noble/hashes/utils';
 /**
  * AES-128-GCM encrypted content encoding provider.
  */
-export class AES128GCM extends ECE {
+export class AES128GCM implements ECE {
   /**
    * Internal cache for the pseudo-random key (PRK).
    */
@@ -112,17 +112,15 @@ export class AES128GCM extends ECE {
   constructor(
     readonly ikm: Uint8Array,
     readonly header: AES128GCMHeader = new AES128GCMHeader()
-  ) {
-    super();
-  }
+  ) {}
 
-  override encrypt(data: Uint8Array, seq = 0) {
+  encrypt(data: Uint8Array, seq = 0) {
     const aes = gcm(this.cek, this.nonce(seq));
     const ciphertext = aes.encrypt(data);
     return concat(this.header.toBytes(), ciphertext);
   }
 
-  override decrypt(data: Uint8Array, seq = 0) {
+  decrypt(data: Uint8Array, seq = 0) {
     // Extract the ciphertext from the data.
     const ciphertext = data.subarray(this.header.byteLength, data.byteLength);
     const aes = gcm(this.cek, this.nonce(seq));
@@ -133,7 +131,7 @@ export class AES128GCM extends ECE {
 /**
  * Header describing the parameters for AES-128-GCM encrypted content encoding scheme.
  */
-export class AES128GCMHeader extends ECEHeader {
+export class AES128GCMHeader {
   /**
    * The number of octets in the keyid.
    */
@@ -160,8 +158,6 @@ export class AES128GCMHeader extends ECEHeader {
     readonly rs: number = AES128GCM_RS_DEFAULT,
     readonly keyid: Uint8Array = new Uint8Array(0)
   ) {
-    super();
-
     // Sanitize the salt length.
     if (salt.length !== AES128GCM_SALT_LENGTH) {
       throw new RangeError(
@@ -184,7 +180,7 @@ export class AES128GCMHeader extends ECEHeader {
     }
   }
 
-  static override fromBytes(value: Uint8Array) {
+  static fromBytes(value: Uint8Array) {
     const salt = value.subarray(0, AES128GCM_SALT_LENGTH);
     const rs = value.subarray(AES128GCM_SALT_LENGTH, AES128GCM_SALT_LENGTH + AES128GCM_RS_LENGTH);
     const idlen = value[AES128GCM_SALT_LENGTH + AES128GCM_RS_LENGTH] ?? 0;
@@ -198,7 +194,7 @@ export class AES128GCMHeader extends ECEHeader {
     return new this(salt, rsNumber, keyid);
   }
 
-  override toBytes(): Uint8Array {
+  toBytes(): Uint8Array {
     const rsBuffer = new ArrayBuffer(AES128GCM_RS_LENGTH);
     const rsView = new DataView(rsBuffer);
     rsView.setUint32(0, this.rs);

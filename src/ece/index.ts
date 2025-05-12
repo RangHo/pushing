@@ -1,4 +1,4 @@
-import { UnsupportedError } from '../errors';
+import { NotImplementedError, UnsupportedError } from '../errors';
 
 /**
  * Supported content encodings in encrypted Content-Encoding for HTTP.
@@ -16,7 +16,7 @@ export type ContentEncoding = 'aes128gcm' | 'aesgcm' | 'aesgcm128';
 /**
  * Abstract encrypted content encoding provider.
  */
-export abstract class ECE {
+export interface ECE {
   /**
    * Encrypt the given plaintext data into ciphertext.
    *
@@ -24,7 +24,7 @@ export abstract class ECE {
    * @param seq - Sequence number of the record that is used to calculate encryption nonce.
    * @returns Encrypted payload.
    */
-  abstract encrypt(data: Uint8Array, seq?: number): Uint8Array;
+  encrypt(data: Uint8Array, seq?: number): Uint8Array;
 
   /**
    * Decrypt the given encrypted data into plaintext.
@@ -33,18 +33,7 @@ export abstract class ECE {
    * @param seq - Seequence number of the record that is used to calculate decryption nonce.
    * @returns Decrypted plaintext data.
    */
-  abstract decrypt(data: Uint8Array, seq?: number): Uint8Array;
-}
-
-/**
- * Abstract encrypted content encoding header.
- */
-export abstract class ECEHeader {
-  static fromBytes(_bytes: Uint8Array): ECEHeader {
-    throw new TypeError('Cannot instantiate an abstract class.');
-  }
-
-  abstract toBytes(): Uint8Array;
+  decrypt(data: Uint8Array, seq?: number): Uint8Array;
 }
 
 /**
@@ -54,12 +43,11 @@ export abstract class ECEHeader {
  * @param encoding - Type of encoding scheme to use.
  * @returns Encrypted message data.
  */
-export function encrypt(message: Uint8Array, encoding: ContentEncoding = 'aes128gcm') {
+export function encrypt(_message: Uint8Array, encoding: ContentEncoding = 'aes128gcm') {
   switch (encoding) {
     case 'aes128gcm':
-      break;
     case 'aesgcm':
-      break;
+      throw new NotImplementedError('Encryption is not yet supported.');
     case 'aesgcm128':
       throw new UnsupportedError(
         `'aesgcm128' is not supported. Please use 'aes128gcm' or 'aesgcm' instead.`
@@ -81,9 +69,8 @@ export function encrypt(message: Uint8Array, encoding: ContentEncoding = 'aes128
 export function decrypt(_message: Uint8Array, encoding: ContentEncoding = 'aes128gcm') {
   switch (encoding) {
     case 'aes128gcm':
-      break;
     case 'aesgcm':
-      break;
+      throw new NotImplementedError('Decryption is not yet supported.');
     case 'aesgcm128':
       throw new UnsupportedError(
         `'aesgcm128' is not supported. Please use 'aes128gcm' or 'aesgcm' instead.`
