@@ -11,7 +11,7 @@ import {
   AES128GCM_RS_MINIMUM,
   AES128GCM_SALT_LENGTH,
 } from '../constants';
-import { concat } from '../utilities';
+import { concat, xor } from '../utilities';
 import { gcm } from '@noble/ciphers/aes';
 import { expand, extract } from '@noble/hashes/hkdf';
 import { sha256 } from '@noble/hashes/sha2';
@@ -21,6 +21,11 @@ import { randomBytes } from '@noble/hashes/utils';
  * AES-128-GCM encrypted content encoding provider.
  */
 export class AES128GCM implements ECE {
+  /**
+   * The header used to derive the salt and record size. If not provided, a default header will be created.
+   */
+  readonly header: AES128GCMHeader;
+
   /**
    * Internal cache for the pseudo-random key (PRK).
    */
@@ -92,27 +97,23 @@ export class AES128GCM implements ECE {
     const seqView = new DataView(seqBuffer);
     seqView.setUint32(8, seq);
     const seqArray = new Uint8Array(seqBuffer, 0, AES128GCM_NONCE_LENGTH);
-    const result = new Uint8Array(AES128GCM_NONCE_LENGTH);
-    for (let i = 0; i < AES128GCM_NONCE_LENGTH; i++) {
-      // XOR the nonce with the sequence number.
-      // Note: since we create all arrays with set length, the indices are guaranteed to resolve.
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      result[i] = this._nonce[i]! ^ seqArray[i]!;
-    }
 
-    return result;
+    // Peform XOR.
+    return xor(this._nonce, seqArray);
   }
 
   /**
    * Create a new AES128GCM instance with the given input key material (IKM) and optional header.
    *
    * @param ikm - The input key material (IKM) used to derive the PRK and CEK.
-   * @param header - The header used to derive the salt and record size. If not provided, a default header will be created.
+   * @param header - Optional header containing the salt, record size, and keyid.
    */
   constructor(
     readonly ikm: Uint8Array,
-    readonly header: AES128GCMHeader = new AES128GCMHeader()
-  ) {}
+    header: Partial<AES128GCMHeader> = {}
+  ) {
+    this.header = new AES128GCMHeader(header.salt, header.rs, header.keyid);
+  }
 
   encrypt(data: Uint8Array, seq = 0) {
     const aes = gcm(this.cek, this.nonce(seq));
